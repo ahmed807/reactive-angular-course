@@ -1,60 +1,76 @@
-import {Component, OnInit} from '@angular/core';
-import {Course, sortCoursesBySeqNo} from '../model/course';
-import {interval, noop, Observable, of, throwError, timer} from 'rxjs';
-import {catchError, delay, delayWhen, filter, finalize, map, retryWhen, shareReplay, tap} from 'rxjs/operators';
-import {HttpClient} from '@angular/common/http';
-import {MatDialog, MatDialogConfig} from '@angular/material/dialog';
-import {CourseDialogComponent} from '../course-dialog/course-dialog.component';
+import { Component, OnInit } from "@angular/core";
+import { Course, sortCoursesBySeqNo } from "../model/course";
+import { MatDialog, MatDialogConfig } from "@angular/material/dialog";
+import { Observable, interval, noop, of, throwError, timer } from "rxjs";
+import {
+  catchError,
+  delay,
+  delayWhen,
+  filter,
+  finalize,
+  map,
+  retryWhen,
+  shareReplay,
+  tap,
+} from "rxjs/operators";
 
+import { CourseDialogComponent } from "../course-dialog/course-dialog.component";
+import { CoursesService } from "../services/courses.service";
+import { HttpClient } from "@angular/common/http";
+import { LoadingService } from "../loading/loading.service";
 
 @Component({
-  selector: 'home',
-  templateUrl: './home.component.html',
-  styleUrls: ['./home.component.css']
+  selector: "home",
+  templateUrl: "./home.component.html",
+  styleUrls: ["./home.component.css"],
 })
 export class HomeComponent implements OnInit {
+  beginnerCourses$: Observable<Course[]>;
 
-  beginnerCourses: Course[];
+  advancedCourses$: Observable<Course[]>;
 
-  advancedCourses: Course[];
-
-
-  constructor(private http: HttpClient, private dialog: MatDialog) {
-
-  }
+  constructor(
+    private coursesService: CoursesService,
+    private loadingService: LoadingService
+  ) {}
 
   ngOnInit() {
+    this.reloadCourses();
+    //  ---- OLD CODE -----
+    // this.http.get("/api/courses").subscribe((res) => {
+    //   const courses: Course[] = res["payload"].sort(sortCoursesBySeqNo);
 
-    this.http.get('/api/courses')
-      .subscribe(
-        res => {
+    //   this.beginnerCourses = courses.filter(
+    //     (course) => course.category == "BEGINNER"
+    //   );
 
-          const courses: Course[] = res["payload"].sort(sortCoursesBySeqNo);
-
-          this.beginnerCourses = courses.filter(course => course.category == "BEGINNER");
-
-          this.advancedCourses = courses.filter(course => course.category == "ADVANCED");
-
-        });
-
+    //   this.advancedCourses = courses.filter(
+    //     (course) => course.category == "ADVANCED"
+    //   );
+    // });
   }
 
-  editCourse(course: Course) {
+  reloadCourses() {
+    // this.loadingService.loadingOn();
 
-    const dialogConfig = new MatDialogConfig();
+    // $ convention for observable variables
+    const courses$ = this.coursesService.loadAllCourses().pipe(
+      map((courses) => courses.sort(sortCoursesBySeqNo))
+      // finalize(() => this.loadingService.loadingOff())
+    );
 
-    dialogConfig.disableClose = true;
-    dialogConfig.autoFocus = true;
-    dialogConfig.width = "400px";
+    const loadCourses$ = this.loadingService.showLoaderUntilCompleted(courses$);
 
-    dialogConfig.data = course;
+    this.beginnerCourses$ = loadCourses$.pipe(
+      map((courses) =>
+        courses.filter((course) => course.category == "BEGINNER")
+      )
+    );
 
-    const dialogRef = this.dialog.open(CourseDialogComponent, dialogConfig);
-
+    this.advancedCourses$ = loadCourses$.pipe(
+      map((courses) =>
+        courses.filter((course) => course.category == "ADVANCED")
+      )
+    );
   }
-
 }
-
-
-
-
